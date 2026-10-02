@@ -1,0 +1,5 @@
+name = "trailbraid"
+compatibility_date = "2026-10-02"
+[assets]
+directory = "./dist"
+# Configuration only. No infrastructure has been provisioned.
