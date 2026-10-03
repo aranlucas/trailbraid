@@ -2,11 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { Atlas, Profile } from "./Atlas";
 import { COLORS, parseGpx, restore, seedRoutes, summary } from "./route";
 import type { Route } from "./route";
+
 const KEY = "trailbraid.atlas.v1";
+
 const format = (n: number | null, suffix: string) =>
   n === null
     ? "Unknown"
     : `${suffix === "km" ? n.toFixed(1) : Math.round(n).toLocaleString()} ${suffix}`;
+
 function initial() {
   try {
     return { routes: restore(localStorage.getItem(KEY)), error: "" };
@@ -18,6 +21,7 @@ function initial() {
     };
   }
 }
+
 export default function App() {
   const [boot] = useState(initial);
   const [routes, setRoutes] = useState<Route[]>(boot.routes);
@@ -32,8 +36,10 @@ export default function App() {
   const chosen = routes.find((r) => r.id === active) ?? routes[0];
   const visible = compare ? routes : chosen ? [chosen] : [];
   const max = Math.max(1, ...visible.map((r) => summary(r.points).distance));
+
   const end = Math.min(to, max),
     start = Math.min(from, end);
+
   useEffect(() => {
     try {
       localStorage.setItem(KEY, JSON.stringify({ version: 1, routes }));
@@ -43,12 +49,15 @@ export default function App() {
       );
     }
   }, [routes]);
+
   function change(next: Route[]) {
     setHistory((h) => [...h.slice(-19), routes]);
     setRoutes(next);
   }
+
   function undo() {
     const previous = history.at(-1);
+
     if (previous) {
       setRoutes(previous);
       setHistory((h) => h.slice(0, -1));
@@ -56,24 +65,30 @@ export default function App() {
       setNotice("Last route change undone.");
     }
   }
+
   async function importFile(file?: File) {
     if (!file) return;
     setBusy(true);
+
     try {
       if (routes.length >= 4)
         throw new Error(
           "This atlas holds four routes. Remove one before importing.",
         );
+
       if (file.size > 5_000_000)
         throw new Error("GPX files are limited to 5 MB.");
+
       const parsed = parseGpx(await file.text(), (t) =>
         new DOMParser().parseFromString(t, "application/xml"),
       );
+
       const route = {
         ...parsed,
         id: crypto.randomUUID(),
         color: COLORS[routes.length],
       };
+
       change([...routes, route]);
       setActive(route.id);
       setNotice(`Imported ${route.name}. Its geometry stays on this device.`);
@@ -81,13 +96,16 @@ export default function App() {
       setNotice(e instanceof Error ? e.message : "Import failed.");
     } finally {
       setBusy(false);
+
       if (input.current) input.current.value = "";
     }
   }
+
   function remove(id: string) {
     change(routes.filter((r) => r.id !== id));
     setNotice("Route removed. Undo is available.");
   }
+
   function exportNotes() {
     const data = {
       version: 1,
@@ -100,9 +118,11 @@ export default function App() {
       })),
       note: "Geometry/elevation diagnostics only. Decorative contours are not terrain. Raw GPX ascent is unsmoothed.",
     };
+
     const url = URL.createObjectURL(
       new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }),
     );
+
     const a = document.createElement("a");
     a.href = url;
     a.download = "trailbraid-notes.json";
@@ -110,8 +130,10 @@ export default function App() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     setNotice("Route notes exported.");
   }
+
   const overview = chosen ? summary(chosen.points) : null,
     segment = chosen ? summary(chosen.points, start, end) : null;
+
   return (
     <>
       <header>
