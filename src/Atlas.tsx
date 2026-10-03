@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { mapPaths, samples } from "./route";
 import type { Route } from "./route";
+
 export function Atlas({
   routes,
   active,
@@ -15,6 +16,7 @@ export function Atlas({
   onSelect: (id: string) => void;
 }) {
   const paths = useMemo(() => mapPaths(routes), [routes]);
+
   return (
     <div className="atlas">
       <svg
@@ -106,6 +108,7 @@ export function Atlas({
     </div>
   );
 }
+
 export function Profile({
   route,
   from,
@@ -119,26 +122,34 @@ export function Profile({
 }) {
   const data = samples(route.points);
   const known = data.filter((p) => p.ele !== undefined);
+
   const low = known.length
     ? Math.floor(Math.min(...known.map((p) => p.ele!)) / 100) * 100
     : 0;
+
   const high = known.length
     ? Math.ceil(Math.max(...known.map((p) => p.ele!)) / 100) * 100 + 30
     : 1;
+
   const x = (km: number) => 55 + (km / maximum) * 865;
   const y = (ele: number) => 128 - ((ele - low) / (high - low)) * 95;
   let pen = false;
+
   const path = data
     .map((p) => {
       if (p.ele === undefined) {
         pen = false;
+
         return "";
       }
+
       const part = `${pen && !p.breakBefore ? "L" : "M"}${x(p.km)},${y(p.ele)}`;
       pen = true;
+
       return part;
     })
     .join(" ");
+
   return (
     <div className="profile">
       <h3>
