@@ -10,10 +10,11 @@ Requires **Node 24+** and npm. No account, key, model download or external servi
 
 ```sh
 npm ci --ignore-scripts
+npm install -g portless@0.15.7
 npm run dev
 ```
 
-Vite prints a localhost URL. For a production/offline check:
+Open **https://trailbraid.localhost**, or the URL printed by Portless. For a production/offline check:
 
 ```sh
 npm run check
@@ -22,15 +23,16 @@ npm run preview
 
 The production build includes a versioned service worker. After the first successful online/local-server load and activation, the bundled app can reopen without a network connection at that origin. Browser storage, file and codec support still apply. Dev mode does not install the offline cache.
 
-### Named local URL with Portless
+### Development URL with Portless
 
-[Portless](https://github.com/vercel-labs/portless/tree/v0.15.7) gives this checkout a
-stable local URL. Complete the local setup above, use **Node.js 24 or newer**
-(within this project's supported range), then run:
+The normal `npm run dev` command uses
+[Portless](https://github.com/vercel-labs/portless/tree/v0.15.7) for a stable local URL.
+Install its CLI once with **Node.js 24 or newer** (within this project's supported
+range), then run:
 
 ```sh
 npm install -g portless@0.15.7
-npm run dev:portless
+npm run dev
 ```
 
 Open **https://trailbraid.localhost** with the default proxy settings.
@@ -43,7 +45,7 @@ Portless supplies Vite with a free port, a loopback host, and `--strictPort`.
 
 Linked Git worktrees receive a branch-name prefix, such as
 `https://fix-ui.trailbraid.localhost`; use the URL Portless prints.
-Use `npm run dev` for the existing direct-server workflow.
+Use `npm run dev:direct` to run the original localhost server without Portless.
 
 Browser storage and offline caches belong to each origin. Existing data at a
 numbered localhost URL stays there; use the app's export/import flow when available
