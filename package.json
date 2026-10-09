@@ -22,12 +22,12 @@
     "@turf/helpers": "7.4.0"
   },
   "devDependencies": {
-    "vite": "8.3.2",
+    "vite": "8.3.4",
     "typescript": "7.0.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "oxlint": "1.86.0",
-    "@oxlint/plugins": "1.86.0",
+    "oxlint": "1.87.0",
+    "@oxlint/plugins": "1.87.0",
     "portless": "0.15.7"
   }
 }
