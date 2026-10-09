@@ -1,6 +1,12 @@
 node_modules/
 dist/
+.cloudflare/
 .env*
 !.env.example
 .DS_Store
 coverage/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example

@@ -10,12 +10,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   ci:
-    runs-on: ${{ vars.LOCAL_CI_ENABLED == 'true' && fromJSON('["self-hosted","linux","x64","omarchy-ci"]') || 'ubuntu-latest' }}
+    name: Lint, test, build
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Check out repository
@@ -23,21 +24,20 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      # Installs the pnpm version from package.json and Node.js from .node-version,
+      # then runs a frozen-lockfile install.
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
         with:
-          node-version-file: .node-version
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
+          cache: true
+          require-lockfile: true
 
       - parallel:
           - name: Lint
-            run: npm run lint
+            run: pnpm lint
 
           - name: Test
-            run: npm test
+            run: pnpm test
 
           - name: Build
-            run: npm run build
+            run: pnpm build

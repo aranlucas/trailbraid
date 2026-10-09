@@ -1,53 +1,77 @@
 # Trailbraid
 
+[![CI](https://github.com/aranlucas/trailbraid/actions/workflows/ci.yml/badge.svg)](https://github.com/aranlucas/trailbraid/actions/workflows/ci.yml)
+
 Explore GPX geometry without a map service. Two routes share one coordinate canvas and a distance window across their elevation profiles.
 
-## Try it
+Open the synthetic atlas, move the From/To sliders, select a route, import a GPX, then export comparison notes. No account, API key, model download or external service is needed.
 
-Open the synthetic atlas, move the From/To sliders, select a route, import a GPX, then export comparison notes.
+## Getting started
 
-Requires **Node 24+** and npm. No account, key, model download or external service is needed.
-
-```sh
-npm ci --ignore-scripts
-npm run dev
-```
-
-Open **https://trailbraid.localhost**. `npm run dev` runs through [Portless](https://github.com/vercel-labs/portless) (a dev dependency); its first run may ask for `sudo` to bind port 443 and trust a local certificate. For a production/offline check:
+Requires **Node 24+** (see `.node-version`) and **pnpm**. The pnpm version is pinned in `package.json` (`packageManager`), so [Corepack](https://nodejs.org/api/corepack.html) or [`pnpm self-update`](https://pnpm.io/cli/self-update) picks it up automatically.
 
 ```sh
-npm run check
-npm run preview
+pnpm install --frozen-lockfile
+pnpm dev
 ```
 
-The production build includes a versioned service worker. After the first successful online/local-server load and activation, the bundled app can reopen without a network connection at that origin. Browser storage, file and codec support still apply. Dev mode does not install the offline cache.
+Open **https://trailbraid.localhost**. `pnpm dev` runs through [Portless](https://github.com/vercel-labs/portless) (a dev dependency); its first run may ask for `sudo` to bind port 443 and trust a local certificate.
 
-## Why this library
+### Scripts
 
-Turf 7.4.0 distance/helpers (MIT). Related non-trending dependency inspired by the live monthly spatial projects; no code copied from them.
-
-Live GitHub Trending evidence was inspected on 2 October 2026 across daily, weekly, monthly and language views. This project does not claim that its core dependency was itself trending or newly released.
+| Command          | What it does                                         |
+| ---------------- | ---------------------------------------------------- |
+| `pnpm dev`       | Vite dev server behind Portless                      |
+| `pnpm lint`      | [oxlint](https://oxc.rs/docs/guide/usage/linter)     |
+| `pnpm test`      | [Vitest](https://vitest.dev/) over `tests/*.test.ts` |
+| `pnpm typecheck` | Strict TypeScript check, no emit                     |
+| `pnpm build`     | Typecheck and Vite production build                  |
+| `pnpm check`     | Lint, test and build — the same gates CI runs        |
+| `pnpm preview`   | Serve the production build locally                   |
+| `pnpm deploy`    | Build and deploy to Cloudflare with `cf deploy`      |
 
 ## Behavior and limits
 
-GPX import is limited to 5 MB / 20,000 points, four routes per atlas. Track segments remain separate. Missing elevations stay unknown. Ascent is raw, unsmoothed GPX ascent and can exaggerate noise. The decorative contours are not terrain. No navigation, weather, hazard assessment or online tiles. Exported notes summarize routes; retain original GPX files yourself.
+- GPX import is limited to 5 MB / 20,000 points, four routes per atlas.
+- Track segments remain separate. Missing elevations stay unknown.
+- Ascent is raw, unsmoothed GPX ascent and can exaggerate noise.
+- The decorative contours are not terrain. No navigation, weather, hazard assessment or online tiles.
+- Exported notes summarize routes; keep your original GPX files.
+- Changes can be undone during the current visit. Local storage failures show a recovery message.
+- The app makes no external network requests for user data and has no analytics. Sample data and media are synthetic.
 
-Local browser storage failures produce a recovery message. Imports are bounded and validated. Changes can be undone during the current visit. The app makes no external network requests for user data and has no analytics. Sample data and media are synthetic.
+## Continuous integration
 
-## Verification
+[`ci.yml`](.github/workflows/ci.yml) runs on every push to `main` and every pull request. [`pnpm/setup`](https://github.com/pnpm/setup) installs pnpm, the Node version from `.node-version` and the dependencies (frozen lockfile), then runs lint, tests, build and `pnpm audit --prod` in parallel. Actions are pinned to commit SHAs and the checkout does not persist credentials.
 
-`npm run check` runs meaningful core tests, strict TypeScript checks and a production build. CI repeats these on Node 24 and audits production dependencies. Runtime pins and the lockfile make installs reproducible; lifecycle scripts are disabled. Desktop/mobile browser evidence and interaction notes are recorded in the implementation PR.
+Dependabot PRs are squash-merged by [`dependabot-automerge.yml`](.github/workflows/dependabot-automerge.yml) once CI passes on their exact head commit.
 
-## Deployment configuration
+Exact version pins plus the committed `pnpm-lock.yaml` make installs reproducible. Dependency lifecycle scripts are blocked except `workerd` (Cloudflare's local runtime), allowed in `pnpm-workspace.yaml`.
 
-`wrangler.toml` targets Cloudflare static assets; `railway.json` describes a Vite preview process. Both are **configuration only**. Nothing has been provisioned or deployed. Hosting requires a separate decision about access and provider terms.
+## Deployment
+
+The app deploys to [Cloudflare Workers](https://developers.cloudflare.com/workers/static-assets/) as static assets with the [Cloudflare CLI](https://developers.cloudflare.com/cf/) (`cf`, beta). Configuration lives in `cloudflare.config.ts`; `vite.config.ts` adds the Cloudflare Vite plugin, so `pnpm build` writes to `.cloudflare/output/`.
+
+```sh
+pnpm exec cf auth login
+pnpm exec cf deploy --dry-run   # build and validate without uploading
+pnpm deploy
+```
+
+Nothing has been provisioned or deployed yet. Hosting requires a separate decision about access and provider terms.
 
 ## Code map
 
-- `src/App.tsx`: state composition and user workflow.
-- Domain modules in `src/`: pure calculations / media / physical rules.
-- Rendering components and `styles.css`: native interface and responsive layout.
-- `tests/`: core behavior and input-boundary regression tests.
-- `scripts/offline.mjs`: build-specific cache manifest.
+- `src/App.tsx` — state composition and user workflow.
+- Domain modules in `src/` — pure calculations, media and physical rules.
+- Rendering components and `styles.css` — native interface and responsive layout.
+- `tests/` — core behavior and input-boundary regression tests.
+- `cloudflare.config.ts` / `vite.config.ts` — Cloudflare Worker and build configuration.
 
-See `PRODUCT.md`, `DESIGN.md`, `DEPENDENCIES.md` and `SECURITY.md` for the UI coordinator and future reviewers.
+## Dependencies
+
+Distance math uses [Turf](https://turfjs.org/) 7.4.0 (`@turf/distance`, `@turf/helpers`, MIT). Imported GPX points and saved atlases are validated with [Zod](https://zod.dev/) 4 (`zod/mini`, MIT).
+
+## Further reading
+
+[`PRODUCT.md`](PRODUCT.md) · [`DESIGN.md`](DESIGN.md) · [`SECURITY.md`](SECURITY.md) · [`LICENSE`](LICENSE)

@@ -3,31 +3,37 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": {
-    "node": ">=22.12"
-  },
   "scripts": {
     "dev": "portless run vite",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test tests/*.test.ts",
-    "build": "npm run typecheck && vite build && node scripts/offline.mjs",
+    "test": "vitest run",
+    "build": "pnpm typecheck && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "check": "npm run lint && npm run test && npm run build",
-    "lint": "oxlint ."
+    "check": "pnpm lint && pnpm test && pnpm build",
+    "lint": "oxlint .",
+    "deploy": "cf deploy"
   },
   "dependencies": {
+    "@turf/distance": "7.4.0",
+    "@turf/helpers": "7.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "@turf/distance": "7.4.0",
-    "@turf/helpers": "7.4.0"
+    "zod": "4.6.5"
   },
   "devDependencies": {
-    "vite": "8.3.4",
-    "typescript": "7.0.2",
+    "@cloudflare/vite-plugin": "2.0.0-beta.sha-805ec1ff3",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "cf": "1.0.0-beta.14",
+    "oxfmt": "^0.72.0",
     "oxlint": "1.87.0",
-    "@oxlint/plugins": "1.87.0",
-    "portless": "0.15.7"
-  }
+    "portless": "0.15.7",
+    "typescript": "7.0.2",
+    "vite": "8.3.4",
+    "vitest": "5.0.3"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@12.10.1"
 }
