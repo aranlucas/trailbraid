@@ -13,7 +13,7 @@ npm ci --ignore-scripts
 npm run dev
 ```
 
-Vite prints a localhost URL. For a production/offline check:
+Open **https://trailbraid.localhost**. `npm run dev` runs through [Portless](https://github.com/vercel-labs/portless) (a dev dependency); its first run may ask for `sudo` to bind port 443 and trust a local certificate. For a production/offline check:
 
 ```sh
 npm run check
