@@ -1,20 +1,46 @@
-name: Verify
+name: CI
+
 on:
-  pull_request:
+  workflow_dispatch:
   push:
     branches: [main]
+  pull_request:
+
 permissions:
   contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  verify:
+  ci:
     runs-on: ${{ vars.LOCAL_CI_ENABLED == 'true' && fromJSON('["self-hosted","linux","x64","omarchy-ci"]') || 'ubuntu-latest' }}
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: 24
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
           cache: npm
-      - run: npm ci --ignore-scripts
-      - run: npm run check
-      - run: npm audit --omit=dev --audit-level=high
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - parallel:
+          - name: Lint
+            run: npm run lint
+
+          - name: Test
+            run: npm test
+
+          - name: Build
+            run: npm run build
+
+          - name: Audit production dependencies
+            run: npm audit --omit=dev --audit-level=high
