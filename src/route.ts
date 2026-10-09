@@ -1,5 +1,6 @@
 import { distance } from "@turf/distance";
 import { point } from "@turf/helpers";
+import { z } from "zod/mini";
 
 export type RoutePoint = {
   lon: number;
@@ -21,35 +22,40 @@ export const COLORS = ["#24624c", "#c16b39", "#5868a1", "#a33f64"];
 
 export const MAX_POINTS = 20_000;
 
-// eslint-disable-next-line anti-slop/no-unknown-parameters -- This public parser validates untrusted imported coordinates before creating RoutePoint values.
+const COORDINATES = "Coordinates must be finite longitude/latitude values.";
+const ELEVATION = "Elevation must be a finite value in metres.";
+const POINT_COUNT = "A route needs 2–20,000 points.";
+
+const bounded = (limit: number, error: string) =>
+  z.number({ error }).check(z.refine((v) => Math.abs(v) <= limit, { error }));
+
+const RoutePointSchema = z.object(
+  {
+    lon: bounded(180, COORDINATES),
+    lat: bounded(90, COORDINATES),
+    ele: z.optional(bounded(20_000, ELEVATION)),
+    breakBefore: z.optional(z.boolean()),
+  },
+  { error: "Invalid route point." },
+);
+
+const RoutePointsSchema = z
+  .array(RoutePointSchema, { error: POINT_COUNT })
+  .check(z.minLength(2, { error: POINT_COUNT }), z.maxLength(MAX_POINTS, { error: POINT_COUNT }));
+
+const SavedAtlasSchema = z.object({
+  version: z.literal(1),
+  routes: z
+    .array(z.object({ id: z.string(), name: z.string(), points: RoutePointsSchema }))
+    .check(z.maxLength(4)),
+});
+
 export function validatePoints(values: unknown): RoutePoint[] {
-  if (!Array.isArray(values) || values.length < 2 || values.length > MAX_POINTS)
-    throw new Error("A route needs 2–20,000 points.");
+  const result = RoutePointsSchema.safeParse(values);
 
-  return values.map((p) => {
-    // eslint-disable-next-line anti-slop/no-runtime-typeof -- Imported array elements must be objects before coordinate validation.
-    if (!p || typeof p !== "object") throw new Error("Invalid route point.");
-    const { lon, lat, ele, breakBefore } = p;
+  if (!result.success) throw new Error(result.error.issues[0].message);
 
-    if (
-      !Number.isFinite(lon) ||
-      !Number.isFinite(lat) ||
-      Math.abs(lon) > 180 ||
-      Math.abs(lat) > 90
-    )
-      throw new Error("Coordinates must be finite longitude/latitude values.");
-
-    if (ele !== undefined && (!Number.isFinite(ele) || Math.abs(ele) > 20_000))
-      throw new Error("Elevation must be a finite value in metres.");
-
-    const validated: RoutePoint = { lon, lat };
-
-    if (ele !== undefined) validated.ele = ele;
-
-    if (breakBefore) validated.breakBefore = true;
-
-    return validated;
-  });
+  return result.data;
 }
 
 export function samples(points: RoutePoint[]): Sample[] {
@@ -57,11 +63,9 @@ export function samples(points: RoutePoint[]): Sample[] {
 
   return points.map((p, i) => {
     if (i && !p.breakBefore)
-      km += distance(
-        point([points[i - 1].lon, points[i - 1].lat]),
-        point([p.lon, p.lat]),
-        { units: "kilometers" },
-      );
+      km += distance(point([points[i - 1].lon, points[i - 1].lat]), point([p.lon, p.lat]), {
+        units: "kilometers",
+      });
 
     return { ...p, km };
   });
@@ -99,8 +103,8 @@ export function summary(points: RoutePoint[], from = 0, to = Infinity) {
   }
 
   const elevations = data
-    .filter((p) => p.km >= start && p.km <= end && p.ele !== undefined)
-    .map((p) => p.ele!);
+    .filter((p) => p.km >= start && p.km <= end)
+    .flatMap((p) => (p.ele === undefined ? [] : [p.ele]));
 
   if (data.every((p) => p.ele === undefined)) known = false;
 
@@ -117,17 +121,11 @@ export function summary(points: RoutePoint[], from = 0, to = Infinity) {
 
 type ImportedRoute = Pick<Route, "name" | "points">;
 
-export function parseGpx(
-  text: string,
-  parse: (text: string) => Document,
-): ImportedRoute {
-  if (text.length > 5_000_000)
-    throw new Error("GPX files are limited to 5 MB.");
+export function parseGpx(text: string, parse: (text: string) => Document): ImportedRoute {
+  if (text.length > 5_000_000) throw new Error("GPX files are limited to 5 MB.");
 
   if (/<!DOCTYPE|<!ENTITY/i.test(text))
-    throw new Error(
-      "GPX files with DTD or entity declarations are not supported.",
-    );
+    throw new Error("GPX files with DTD or entity declarations are not supported.");
   const doc = parse(text);
 
   if (
@@ -141,25 +139,16 @@ export function parseGpx(
   const points: RoutePoint[] = [];
 
   for (const group of groups.length ? groups : fallback) {
-    const nodes = Array.from(
-      group.getElementsByTagNameNS("*", groups.length ? "trkpt" : "rtept"),
-    );
+    const nodes = Array.from(group.getElementsByTagNameNS("*", groups.length ? "trkpt" : "rtept"));
 
     nodes.forEach((el, i) => {
       const lon = el.getAttribute("lon"),
         lat = el.getAttribute("lat");
 
-      if (
-        lon === null ||
-        lat === null ||
-        lon.trim() === "" ||
-        lat.trim() === ""
-      )
+      if (lon === null || lat === null || lon.trim() === "" || lat.trim() === "")
         throw new Error("Every GPX point needs coordinates.");
 
-      const elevation = el
-        .getElementsByTagNameNS("*", "ele")[0]
-        ?.textContent?.trim();
+      const elevation = el.getElementsByTagNameNS("*", "ele")[0]?.textContent?.trim();
 
       const coordinate: RoutePoint = { lon: Number(lon), lat: Number(lat) };
 
@@ -168,16 +157,13 @@ export function parseGpx(
       if (i === 0 && points.length) coordinate.breakBefore = true;
       points.push(coordinate);
 
-      if (points.length > MAX_POINTS)
-        throw new Error("A route is limited to 20,000 points.");
+      if (points.length > MAX_POINTS) throw new Error("A route is limited to 20,000 points.");
     });
   }
 
   const name =
-    doc
-      .getElementsByTagNameNS("*", "name")[0]
-      ?.textContent?.trim()
-      .slice(0, 80) || "Imported route";
+    doc.getElementsByTagNameNS("*", "name")[0]?.textContent?.trim().slice(0, 80) ||
+    "Imported route";
 
   return { name, points: validatePoints(points) };
 }
@@ -205,9 +191,7 @@ export function mapPaths(routes: Route[], width = 960, height = 450) {
 
   const cos = Math.max(
     0.01,
-    Math.cos(
-      ((flat.reduce((s, p) => s + p.lat, 0) / flat.length) * Math.PI) / 180,
-    ),
+    Math.cos(((flat.reduce((s, p) => s + p.lat, 0) / flat.length) * Math.PI) / 180),
   );
 
   const xs = flat.map((p) => p.lon * cos),
@@ -236,10 +220,7 @@ export function mapPaths(routes: Route[], width = 960, height = 450) {
       route: r,
       coords,
       path: coords
-        .map(
-          (p, i) =>
-            `${i === 0 || p.breakBefore ? "M" : "L"}${p.x.toFixed(2)},${p.y.toFixed(2)}`,
-        )
+        .map((p, i) => `${i === 0 || p.breakBefore ? "M" : "L"}${p.x.toFixed(2)},${p.y.toFixed(2)}`)
         .join(" "),
     };
   });
@@ -260,8 +241,7 @@ export function seedRoutes(): Route[] {
         theta = t * Math.PI * 2;
 
       return {
-        lon:
-          -122 + (0.025 * wide * Math.cos(theta) + 0.007 * Math.sin(theta * 3)),
+        lon: -122 + (0.025 * wide * Math.cos(theta) + 0.007 * Math.sin(theta * 3)),
         lat: 45 + (0.018 * Math.sin(theta) + 0.003 * Math.sin(theta * 5)),
         ele: Math.round(base + gain * Math.pow(Math.sin(Math.PI * t), 2)),
       };
@@ -286,27 +266,15 @@ export function seedRoutes(): Route[] {
 
 export function restore(text: string | null): Route[] {
   if (text === null) return seedRoutes();
-  const data = JSON.parse(text);
+  const result = SavedAtlasSchema.safeParse(JSON.parse(text));
 
-  if (
-    data.version !== 1 ||
-    !Array.isArray(data.routes) ||
-    data.routes.length > 4
-  )
-    throw new Error("The saved atlas could not be read.");
+  if (!result.success) throw new Error("The saved atlas could not be read.");
   const ids = new Set<string>();
 
-  return data.routes.map((r: Route, i: number) => {
-    // eslint-disable-next-line anti-slop/no-runtime-typeof -- Saved route identity is untrusted JSON and must be validated before use.
-    if (typeof r.id !== "string" || ids.has(r.id) || typeof r.name !== "string")
-      throw new Error("Invalid saved route.");
+  return result.data.routes.map((r, i) => {
+    if (ids.has(r.id)) throw new Error("Invalid saved route.");
     ids.add(r.id);
 
-    return {
-      id: r.id,
-      name: r.name.slice(0, 80),
-      color: COLORS[i],
-      points: validatePoints(r.points),
-    };
+    return { id: r.id, name: r.name.slice(0, 80), color: COLORS[i], points: r.points };
   });
 }

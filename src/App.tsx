@@ -16,8 +16,7 @@ function initial() {
   } catch {
     return {
       routes: seedRoutes(),
-      error:
-        "Saved atlas was unreadable. Demo routes loaded; import a GPX to start again.",
+      error: "Saved atlas was unreadable. Demo routes loaded; import a GPX to start again.",
     };
   }
 }
@@ -44,9 +43,7 @@ export default function App() {
     try {
       localStorage.setItem(KEY, JSON.stringify({ version: 1, routes }));
     } catch {
-      setNotice(
-        "Browser storage is unavailable or full. Export notes before closing.",
-      );
+      setNotice("Browser storage is unavailable or full. Export notes before closing.");
     }
   }, [routes]);
 
@@ -72,12 +69,9 @@ export default function App() {
 
     try {
       if (routes.length >= 4)
-        throw new Error(
-          "This atlas holds four routes. Remove one before importing.",
-        );
+        throw new Error("This atlas holds four routes. Remove one before importing.");
 
-      if (file.size > 5_000_000)
-        throw new Error("GPX files are limited to 5 MB.");
+      if (file.size > 5_000_000) throw new Error("GPX files are limited to 5 MB.");
 
       const parsed = parseGpx(await file.text(), (t) =>
         new DOMParser().parseFromString(t, "application/xml"),
@@ -142,11 +136,7 @@ export default function App() {
           <p>Your routes, seen differently.</p>
         </div>
         <nav>
-          <button
-            className="primary"
-            onClick={() => input.current?.click()}
-            disabled={busy}
-          >
+          <button className="primary" onClick={() => input.current?.click()} disabled={busy}>
             {busy ? "Reading GPX…" : "Import GPX"}
           </button>
           <button onClick={exportNotes} disabled={!routes.length}>
@@ -183,10 +173,7 @@ export default function App() {
           </div>
           <div className="routes">
             {routes.map((r) => (
-              <div
-                className={`route-row ${chosen?.id === r.id ? "selected" : ""}`}
-                key={r.id}
-              >
+              <div className={`route-row ${chosen?.id === r.id ? "selected" : ""}`} key={r.id}>
                 <button
                   className="route-select"
                   onClick={() => setActive(r.id)}
@@ -211,13 +198,8 @@ export default function App() {
               </div>
             ))}
           </div>
-          <button
-            className="compare"
-            onClick={() => setCompare((c) => !c)}
-            aria-pressed={compare}
-          >
-            <span aria-hidden="true">◯◯</span>{" "}
-            {compare ? "Comparing routes" : "Compare routes"}
+          <button className="compare" onClick={() => setCompare((c) => !c)} aria-pressed={compare}>
+            <span aria-hidden="true">◯◯</span> {compare ? "Comparing routes" : "Compare routes"}
           </button>
           {overview && (
             <section>
@@ -272,8 +254,7 @@ export default function App() {
               Load demo routes
             </button>
             <small>
-              Raw elevation, without smoothing. Gaps stay separate; missing
-              elevation stays unknown.
+              Raw elevation, without smoothing. Gaps stay separate; missing elevation stays unknown.
             </small>
           </section>
         </aside>
@@ -305,9 +286,7 @@ export default function App() {
                       max={max}
                       step="0.1"
                       value={start}
-                      onChange={(e) =>
-                        setFrom(Math.min(Number(e.target.value), end))
-                      }
+                      onChange={(e) => setFrom(Math.min(Number(e.target.value), end))}
                     />
                   </label>
                   <label>
@@ -319,33 +298,20 @@ export default function App() {
                       max={max}
                       step="0.1"
                       value={end}
-                      onChange={(e) =>
-                        setTo(Math.max(Number(e.target.value), start))
-                      }
+                      onChange={(e) => setTo(Math.max(Number(e.target.value), start))}
                     />
                   </label>
                 </div>
                 {visible.map((r) => (
-                  <Profile
-                    route={r}
-                    from={start}
-                    to={end}
-                    maximum={max}
-                    key={r.id}
-                  />
+                  <Profile route={r} from={start} to={end} maximum={max} key={r.id} />
                 ))}
               </div>
             </>
           ) : (
             <div className="empty">
               <h2>A fresh page in your atlas.</h2>
-              <p>
-                Import a GPX track or explore the two synthetic demo routes.
-              </p>
-              <button
-                className="primary"
-                onClick={() => input.current?.click()}
-              >
+              <p>Import a GPX track or explore the two synthetic demo routes.</p>
+              <button className="primary" onClick={() => input.current?.click()}>
                 Import your first GPX
               </button>
               <button
