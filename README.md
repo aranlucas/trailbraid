@@ -42,7 +42,7 @@ Open **https://trailbraid.localhost**. `pnpm dev` runs through [Portless](https:
 
 ## Continuous integration
 
-[`ci.yml`](.github/workflows/ci.yml) runs on every push to `main` and every pull request. It installs with `pnpm install --frozen-lockfile --ignore-scripts` on the Node version from `.node-version`, then runs lint, tests, build and `pnpm audit --prod` in parallel. Actions are pinned to commit SHAs and the checkout does not persist credentials.
+[`ci.yml`](.github/workflows/ci.yml) runs on every push to `main` and every pull request. [`pnpm/setup`](https://github.com/pnpm/setup) installs pnpm, the Node version from `.node-version` and the dependencies (frozen lockfile), then runs lint, tests, build and `pnpm audit --prod` in parallel. Actions are pinned to commit SHAs and the checkout does not persist credentials.
 
 Dependabot PRs are squash-merged by [`dependabot-automerge.yml`](.github/workflows/dependabot-automerge.yml) once CI passes on their exact head commit.
 
