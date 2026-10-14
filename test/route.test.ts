@@ -1,5 +1,7 @@
+import { gpxDocument, gpxNode } from "@test/helpers/gpx";
 import { expect, test } from "vitest";
 import {
+  elevationPath,
   mapPaths,
   restore,
   samples,
@@ -8,7 +10,7 @@ import {
   unwrap,
   validatePoints,
   parseGpx,
-} from "../src/route.ts";
+} from "@/route.ts";
 
 const points = [
   { lon: 0, lat: 0, ele: 10 },
@@ -68,7 +70,7 @@ test("dateline unwrap keeps map local", () => {
 
 test("validation rejects NaN, out-of-world coordinates and too few points", () => {
   expect(() => validatePoints([{ lon: 181, lat: 0 }, points[0]])).toThrow(/Coordinates/);
-  expect(() => validatePoints([{ lon: NaN, lat: 0 }, points[0]])).toThrow();
+  expect(() => validatePoints([{ lon: NaN, lat: 0 }, points[0]])).toThrow(/Coordinates/);
   expect(() => validatePoints([points[0]])).toThrow("A route needs 2–20,000 points.");
   expect(() => validatePoints([{ lon: 0, lat: 0, ele: 30_000 }, points[0]])).toThrow(/Elevation/);
   expect(() => validatePoints(["x", points[0]])).toThrow("Invalid route point.");
@@ -77,12 +79,12 @@ test("validation rejects NaN, out-of-world coordinates and too few points", () =
 
 test("restore accepts empty atlas, validates imported points and catches corrupt schemas", () => {
   expect(restore('{"version":1,"routes":[]}')).toEqual([]);
-  expect(() => restore("broken")).toThrow();
-  expect(() => restore('{"version":2,"routes":[]}')).toThrow();
+  expect(() => restore("broken")).toThrow(/JSON/);
+  expect(() => restore('{"version":2,"routes":[]}')).toThrow("The saved atlas could not be read.");
   expect(restore(null)).toHaveLength(2);
   expect(() =>
     restore(JSON.stringify({ version: 1, routes: [{ id: 1, name: "x", points }] })),
-  ).toThrow();
+  ).toThrow("The saved atlas could not be read.");
   expect(() =>
     restore(
       JSON.stringify({
@@ -109,4 +111,88 @@ test("synthetic routes have truthful measured totals", () => {
     expect(Math.abs(summary(r.points).distance - [8.2, 10.6][i])).toBeLessThan(0.01);
     expect(summary(r.points).ascent).toBe([410, 620][i]);
   }
+});
+
+test("elevation paths restart after missing elevations and segment gaps", () => {
+  const data = [
+    { lon: 0, lat: 0, km: 0, ele: 10 },
+    { lon: 1, lat: 0, km: 1, ele: 20 },
+    { lon: 2, lat: 0, km: 2 },
+    { lon: 3, lat: 0, km: 3, ele: 30 },
+    { lon: 4, lat: 0, km: 4, ele: 40, breakBefore: true },
+    { lon: 5, lat: 0, km: 5, ele: 50 },
+  ];
+  expect(
+    elevationPath(
+      data,
+      (km) => km * 2,
+      (ele) => ele / 10,
+    ),
+  ).toBe("M0,1 L2,2  M6,3 M8,4 L10,5");
+  expect(
+    elevationPath(
+      [],
+      (km) => km,
+      (ele) => ele,
+    ),
+  ).toBe("");
+});
+
+test("map coordinates retain unique stable identities for duplicate samples", () => {
+  const route = {
+    id: "duplicates",
+    name: "Duplicates",
+    color: "#000",
+    points: [points[0], points[0], points[1]],
+  };
+  const keys = mapPaths([route])[0].coords.map((p) => p.key);
+  expect(new Set(keys).size).toBe(3);
+  expect(mapPaths([{ ...route, name: "Renamed" }])[0].coords.map((p) => p.key)).toEqual(keys);
+});
+
+test("GPX tracks retain segment gaps, elevation and trimmed names", () => {
+  const document = gpxDocument(
+    gpxNode("gpx", {}, [
+      gpxNode("name", {}, [], "  Forest walk  "),
+      gpxNode("trkseg", {}, [
+        gpxNode("trkpt", { lon: "0", lat: "0" }, [gpxNode("ele", {}, [], " 12 ")]),
+        gpxNode("trkpt", { lon: "0.01", lat: "0" }, []),
+      ]),
+      gpxNode("trkseg", {}, [
+        gpxNode("trkpt", { lon: "5", lat: "1" }, []),
+        gpxNode("trkpt", { lon: "5.01", lat: "1" }, []),
+      ]),
+    ]),
+  );
+  const route = parseGpx("<gpx/>", () => document);
+  expect(route.name).toBe("Forest walk");
+  expect(route.points).toEqual([
+    { lon: 0, lat: 0, ele: 12 },
+    { lon: 0.01, lat: 0 },
+    { lon: 5, lat: 1, breakBefore: true },
+    { lon: 5.01, lat: 1 },
+  ]);
+  expect(summary(route.points).distance).toBeLessThan(3);
+});
+
+test("GPX route fallback validates missing coordinates and malformed documents", () => {
+  const route = gpxNode("rte", {}, [
+    gpxNode("rtept", { lon: "0", lat: "0" }, []),
+    gpxNode("rtept", { lon: "0.01", lat: "0" }, []),
+  ]);
+  expect(parseGpx("<gpx/>", () => gpxDocument(gpxNode("gpx", {}, [route]))).points).toEqual([
+    { lon: 0, lat: 0 },
+    { lon: 0.01, lat: 0 },
+  ]);
+  const invalid = gpxNode("gpx", {}, [gpxNode("rte", {}, [gpxNode("rtept", { lat: "0" }, [])])]);
+  expect(() => parseGpx("<gpx/>", () => gpxDocument(invalid))).toThrow(
+    "Every GPX point needs coordinates.",
+  );
+  expect(() => parseGpx("<html/>", () => gpxDocument(gpxNode("html", {}, [])))).toThrow(
+    "Choose a valid GPX file.",
+  );
+  const malformed = gpxNode("gpx", {}, [gpxNode("parsererror", {}, [])]);
+  expect(() => parseGpx("broken", () => gpxDocument(malformed))).toThrow(
+    "Choose a valid GPX file.",
+  );
 });

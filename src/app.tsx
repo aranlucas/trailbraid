@@ -1,34 +1,27 @@
-import { useEffect, useRef, useState } from "react";
-import { Atlas, Profile } from "./Atlas";
-import { COLORS, parseGpx, restore, seedRoutes, summary } from "./route";
-import type { Route } from "./route";
+import { useRef, useState, useSyncExternalStore } from "react";
+import { Atlas, Profile } from "@/atlas";
+import { COLORS, parseGpx, seedRoutes, summary } from "@/route";
+import type { Route } from "@/route";
 
-const KEY = "trailbraid.atlas.v1";
+import { createAtlasStore } from "@/atlas-storage";
 
 const format = (n: number | null, suffix: string) =>
   n === null
     ? "Unknown"
     : `${suffix === "km" ? n.toFixed(1) : Math.round(n).toLocaleString()} ${suffix}`;
 
-function initial() {
-  try {
-    return { routes: restore(localStorage.getItem(KEY)), error: "" };
-  } catch {
-    return {
-      routes: seedRoutes(),
-      error: "Saved atlas was unreadable. Demo routes loaded; import a GPX to start again.",
-    };
-  }
-}
-
 export default function App() {
-  const [boot] = useState(initial);
-  const [routes, setRoutes] = useState<Route[]>(boot.routes);
-  const [active, setActive] = useState(boot.routes[0]?.id ?? "");
+  const [store] = useState(() => createAtlasStore(() => localStorage));
+  const { routes, notice } = useSyncExternalStore(
+    store.subscribe,
+    store.getSnapshot,
+    store.getServerSnapshot,
+  );
+  const { setNotice } = store;
+  const [active, setActive] = useState(routes[0]?.id ?? "");
   const [compare, setCompare] = useState(true);
   const [from, setFrom] = useState(1.5);
   const [to, setTo] = useState(5.5);
-  const [notice, setNotice] = useState(boot.error);
   const [history, setHistory] = useState<Route[][]>([]);
   const [busy, setBusy] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -36,30 +29,21 @@ export default function App() {
   const visible = compare ? routes : chosen ? [chosen] : [];
   const max = Math.max(1, ...visible.map((r) => summary(r.points).distance));
 
-  const end = Math.min(to, max),
-    start = Math.min(from, end);
+  const end = Math.min(to, max);
+  const start = Math.min(from, end);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(KEY, JSON.stringify({ version: 1, routes }));
-    } catch {
-      setNotice("Browser storage is unavailable or full. Export notes before closing.");
-    }
-  }, [routes]);
-
-  function change(next: Route[]) {
+  function change(next: Route[], message = notice) {
     setHistory((h) => [...h.slice(-19), routes]);
-    setRoutes(next);
+    store.setRoutes(next, message);
   }
 
   function undo() {
     const previous = history.at(-1);
 
     if (previous) {
-      setRoutes(previous);
+      store.setRoutes(previous, "Last route change undone.");
       setHistory((h) => h.slice(0, -1));
       setActive(previous[0]?.id ?? "");
-      setNotice("Last route change undone.");
     }
   }
 
@@ -83,9 +67,8 @@ export default function App() {
         color: COLORS[routes.length],
       };
 
-      change([...routes, route]);
+      change([...routes, route], `Imported ${route.name}. Its geometry stays on this device.`);
       setActive(route.id);
-      setNotice(`Imported ${route.name}. Its geometry stays on this device.`);
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "Import failed.");
     } finally {
@@ -96,8 +79,10 @@ export default function App() {
   }
 
   function remove(id: string) {
-    change(routes.filter((r) => r.id !== id));
-    setNotice("Route removed. Undo is available.");
+    change(
+      routes.filter((r) => r.id !== id),
+      "Route removed. Undo is available.",
+    );
   }
 
   function exportNotes() {
@@ -125,8 +110,8 @@ export default function App() {
     setNotice("Route notes exported.");
   }
 
-  const overview = chosen ? summary(chosen.points) : null,
-    segment = chosen ? summary(chosen.points, start, end) : null;
+  const overview = chosen ? summary(chosen.points) : null;
+  const segment = chosen ? summary(chosen.points, start, end) : null;
 
   return (
     <>
@@ -246,9 +231,8 @@ export default function App() {
             </button>
             <button
               onClick={() => {
-                change(seedRoutes());
+                change(seedRoutes(), "Synthetic demo routes restored.");
                 setActive("fern");
-                setNotice("Synthetic demo routes restored.");
               }}
             >
               Load demo routes

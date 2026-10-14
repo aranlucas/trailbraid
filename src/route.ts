@@ -77,14 +77,14 @@ export function summary(points: RoutePoint[], from = 0, to = Infinity) {
   const start = Math.max(0, Math.min(from, total));
   const end = Math.max(start, Math.min(to, total));
 
-  let ascent = 0,
-    descent = 0,
-    known = true,
-    maxGrade = 0;
+  let ascent = 0;
+  let descent = 0;
+  let known = true;
+  let maxGrade = 0;
 
   for (let i = 1; i < data.length; i++) {
-    const a = data[i - 1],
-      b = data[i];
+    const a = data[i - 1];
+    const b = data[i];
 
     const d = b.km - a.km;
 
@@ -128,11 +128,7 @@ export function parseGpx(text: string, parse: (text: string) => Document): Impor
     throw new Error("GPX files with DTD or entity declarations are not supported.");
   const doc = parse(text);
 
-  if (
-    doc.getElementsByTagName("parsererror").length ||
-    !doc.documentElement ||
-    doc.documentElement.localName !== "gpx"
-  )
+  if (doc.querySelector("parsererror") || doc.documentElement?.localName !== "gpx")
     throw new Error("Choose a valid GPX file.");
   const groups = Array.from(doc.getElementsByTagNameNS("*", "trkseg"));
   const fallback = Array.from(doc.getElementsByTagNameNS("*", "rte"));
@@ -141,9 +137,9 @@ export function parseGpx(text: string, parse: (text: string) => Document): Impor
   for (const group of groups.length ? groups : fallback) {
     const nodes = Array.from(group.getElementsByTagNameNS("*", groups.length ? "trkpt" : "rtept"));
 
-    nodes.forEach((el, i) => {
-      const lon = el.getAttribute("lon"),
-        lat = el.getAttribute("lat");
+    for (const [i, el] of nodes.entries()) {
+      const lon = el.getAttribute("lon");
+      const lat = el.getAttribute("lat");
 
       if (lon === null || lat === null || lon.trim() === "" || lat.trim() === "")
         throw new Error("Every GPX point needs coordinates.");
@@ -158,7 +154,7 @@ export function parseGpx(text: string, parse: (text: string) => Document): Impor
       points.push(coordinate);
 
       if (points.length > MAX_POINTS) throw new Error("A route is limited to 20,000 points.");
-    });
+    }
   }
 
   const name =
@@ -194,13 +190,13 @@ export function mapPaths(routes: Route[], width = 960, height = 450) {
     Math.cos(((flat.reduce((s, p) => s + p.lat, 0) / flat.length) * Math.PI) / 180),
   );
 
-  const xs = flat.map((p) => p.lon * cos),
-    ys = flat.map((p) => p.lat);
+  const xs = flat.map((p) => p.lon * cos);
+  const ys = flat.map((p) => p.lat);
 
-  const minX = Math.min(...xs),
-    maxX = Math.max(...xs),
-    minY = Math.min(...ys),
-    maxY = Math.max(...ys);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
 
   const scale = Math.min(
     (width - 100) / Math.max(0.00001, maxX - minX),
@@ -210,11 +206,19 @@ export function mapPaths(routes: Route[], width = 960, height = 450) {
   return routes.map((r) => {
     const data = samples(unwrap(r.points, ref));
 
-    const coords = data.map((p) => ({
-      ...p,
-      x: width / 2 + (p.lon * cos - (minX + maxX) / 2) * scale,
-      y: height / 2 - (p.lat - (minY + maxY) / 2) * scale,
-    }));
+    const occurrences = new Map<string, number>();
+    const coords = data.map((p) => {
+      const fingerprint = JSON.stringify([p.lon, p.lat, p.ele, p.breakBefore, p.km]);
+      const occurrence = occurrences.get(fingerprint) ?? 0;
+      occurrences.set(fingerprint, occurrence + 1);
+
+      return {
+        ...p,
+        key: `${fingerprint}:${occurrence}`,
+        x: width / 2 + (p.lon * cos - (minX + maxX) / 2) * scale,
+        y: height / 2 - (p.lat - (minY + maxY) / 2) * scale,
+      };
+    });
 
     return {
       route: r,
@@ -237,8 +241,8 @@ export function seedRoutes(): Route[] {
     color: string,
   ): Route {
     const pts: RoutePoint[] = Array.from({ length: 121 }, (_, i) => {
-      const t = i / 120,
-        theta = t * Math.PI * 2;
+      const t = i / 120;
+      const theta = t * Math.PI * 2;
 
       return {
         lon: -122 + (0.025 * wide * Math.cos(theta) + 0.007 * Math.sin(theta * 3)),
@@ -277,4 +281,18 @@ export function restore(text: string | null): Route[] {
 
     return { id: r.id, name: r.name.slice(0, 80), color: COLORS[i], points: r.points };
   });
+}
+
+export function elevationPath(
+  data: Sample[],
+  x: (km: number) => number,
+  y: (ele: number) => number,
+) {
+  return data
+    .map((p, i) => {
+      if (p.ele === undefined) return "";
+      const connected = data[i - 1]?.ele !== undefined && !p.breakBefore;
+      return `${connected ? "L" : "M"}${x(p.km)},${y(p.ele)}`;
+    })
+    .join(" ");
 }
