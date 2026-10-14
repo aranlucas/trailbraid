@@ -1,20 +1,23 @@
 import { useMemo } from "react";
-import { mapPaths, samples } from "./route";
-import type { Route } from "./route";
+import { elevationPath, mapPaths, samples } from "@/route";
+import type { Route } from "@/route";
 
-export function Atlas({
-  routes,
-  active,
-  from,
-  to,
-  onSelect,
-}: {
+type AtlasProps = {
   routes: Route[];
   active: string;
   from: number;
   to: number;
   onSelect: (id: string) => void;
-}) {
+};
+
+type ProfileProps = {
+  route: Route;
+  from: number;
+  to: number;
+  maximum: number;
+};
+
+export function Atlas({ routes, active, from, to, onSelect }: AtlasProps) {
   const paths = useMemo(() => mapPaths(routes), [routes]);
 
   return (
@@ -54,7 +57,7 @@ export function Atlas({
             {coords.map((p, i) =>
               i > 0 && !p.breakBefore && p.km >= from && coords[i - 1].km <= to ? (
                 <path
-                  key={i}
+                  key={p.key}
                   d={`M${coords[i - 1].x},${coords[i - 1].y}L${p.x},${p.y}`}
                   stroke={route.color}
                   strokeWidth="8"
@@ -64,8 +67,8 @@ export function Atlas({
             )}
             {coords
               .filter((_, i) => i % 20 === 0)
-              .map((p, i) => (
-                <circle key={i} cx={p.x} cy={p.y} r="4.5" fill={route.color} />
+              .map((p) => (
+                <circle key={p.key} cx={p.x} cy={p.y} r="4.5" fill={route.color} />
               ))}
             <circle
               cx={coords[0].x}
@@ -90,17 +93,7 @@ export function Atlas({
   );
 }
 
-export function Profile({
-  route,
-  from,
-  to,
-  maximum,
-}: {
-  route: Route;
-  from: number;
-  to: number;
-  maximum: number;
-}) {
+export function Profile({ route, from, to, maximum }: ProfileProps) {
   const data = samples(route.points);
   const known = data.flatMap((p) => (p.ele === undefined ? [] : [p.ele]));
 
@@ -110,22 +103,7 @@ export function Profile({
 
   const x = (km: number) => 55 + (km / maximum) * 865;
   const y = (ele: number) => 128 - ((ele - low) / (high - low)) * 95;
-  let pen = false;
-
-  const path = data
-    .map((p) => {
-      if (p.ele === undefined) {
-        pen = false;
-
-        return "";
-      }
-
-      const part = `${pen && !p.breakBefore ? "L" : "M"}${x(p.km)},${y(p.ele)}`;
-      pen = true;
-
-      return part;
-    })
-    .join(" ");
+  const path = elevationPath(data, x, y);
 
   return (
     <div className="profile">
@@ -139,8 +117,8 @@ export function Profile({
         </div>
       ) : (
         <svg viewBox="0 0 960 155" role="img" aria-label={`${route.name} elevation profile`}>
-          {[0, 0.5, 1].map((f, i) => (
-            <g key={i}>
+          {[0, 0.5, 1].map((f) => (
+            <g key={f}>
               <path d={`M55 ${128 - f * 95}H930`} stroke="#dcddce" />
               <text x="45" y={132 - f * 95} textAnchor="end" fontSize="12" fill="#637468">
                 {Math.round(low + f * (high - low))} m

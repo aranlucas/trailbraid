@@ -34,7 +34,7 @@ jobs:
 
       - parallel:
           - name: Lint
-            run: pnpm lint
+            run: pnpm lint && pnpm format:check
 
           - name: Test
             run: pnpm test
