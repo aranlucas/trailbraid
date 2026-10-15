@@ -23,7 +23,9 @@ export const COLORS = ["#24624c", "#c16b39", "#5868a1", "#a33f64"];
 export const MAX_POINTS = 20_000;
 
 const COORDINATES = "Coordinates must be finite longitude/latitude values.";
+
 const ELEVATION = "Elevation must be a finite value in metres.";
+
 const POINT_COUNT = "A route needs 2–20,000 points.";
 
 const bounded = (limit: number, error: string) =>
@@ -50,10 +52,14 @@ const SavedAtlasSchema = z.object({
     .check(z.maxLength(4)),
 });
 
+// Untrusted route imports are validated immediately by the schema at this boundary.
+// oxlint-disable-next-line anti-slop/no-unknown-parameters
 export function validatePoints(values: unknown): RoutePoint[] {
   const result = RoutePointsSchema.safeParse(values);
 
-  if (!result.success) throw new Error(result.error.issues[0].message);
+  if (!result.success) {
+    throw new Error(result.error.issues[0].message);
+  }
 
   return result.data;
 }
@@ -62,10 +68,11 @@ export function samples(points: RoutePoint[]): Sample[] {
   let km = 0;
 
   return points.map((p, i) => {
-    if (i && !p.breakBefore)
+    if (i && !p.breakBefore) {
       km += distance(point([points[i - 1].lon, points[i - 1].lat]), point([p.lon, p.lat]), {
         units: "kilometers",
       });
+    }
 
     return { ...p, km };
   });
@@ -88,7 +95,10 @@ export function summary(points: RoutePoint[], from = 0, to = Infinity) {
 
     const d = b.km - a.km;
 
-    if (b.breakBefore || d <= 0 || b.km <= start || a.km >= end) continue;
+    if (b.breakBefore || d <= 0 || b.km <= start || a.km >= end) {
+      continue;
+    }
+
     const share = (Math.min(b.km, end) - Math.max(a.km, start)) / d;
 
     if (a.ele === undefined || b.ele === undefined) {
@@ -106,7 +116,9 @@ export function summary(points: RoutePoint[], from = 0, to = Infinity) {
     .filter((p) => p.km >= start && p.km <= end)
     .flatMap((p) => (p.ele === undefined ? [] : [p.ele]));
 
-  if (data.every((p) => p.ele === undefined)) known = false;
+  if (data.every((p) => p.ele === undefined)) {
+    known = false;
+  }
 
   return {
     distance: end - start,
@@ -121,15 +133,34 @@ export function summary(points: RoutePoint[], from = 0, to = Infinity) {
 
 type ImportedRoute = Pick<Route, "name" | "points">;
 
-export function parseGpx(text: string, parse: (text: string) => Document): ImportedRoute {
-  if (text.length > 5_000_000) throw new Error("GPX files are limited to 5 MB.");
+export type GpxNode = {
+  localName: string;
+  textContent: string | null;
+  getAttribute: (name: string) => string | null;
+  getElementsByTagNameNS: (namespace: string, name: string) => ArrayLike<GpxNode>;
+};
 
-  if (/<!DOCTYPE|<!ENTITY/i.test(text))
+export type GpxDocument = {
+  documentElement: GpxNode;
+  querySelector: (selector: string) => GpxNode | null;
+  getElementsByTagNameNS: (namespace: string, name: string) => ArrayLike<GpxNode>;
+};
+
+export function parseGpx(text: string, parse: (text: string) => GpxDocument): ImportedRoute {
+  if (text.length > 5_000_000) {
+    throw new Error("GPX files are limited to 5 MB.");
+  }
+
+  if (/<!DOCTYPE|<!ENTITY/i.test(text)) {
     throw new Error("GPX files with DTD or entity declarations are not supported.");
+  }
+
   const doc = parse(text);
 
-  if (doc.querySelector("parsererror") || doc.documentElement?.localName !== "gpx")
+  if (doc.querySelector("parsererror") || doc.documentElement?.localName !== "gpx") {
     throw new Error("Choose a valid GPX file.");
+  }
+
   const groups = Array.from(doc.getElementsByTagNameNS("*", "trkseg"));
   const fallback = Array.from(doc.getElementsByTagNameNS("*", "rte"));
   const points: RoutePoint[] = [];
@@ -141,25 +172,32 @@ export function parseGpx(text: string, parse: (text: string) => Document): Impor
       const lon = el.getAttribute("lon");
       const lat = el.getAttribute("lat");
 
-      if (lon === null || lat === null || lon.trim() === "" || lat.trim() === "")
+      if (lon === null || lat === null || lon.trim() === "" || lat.trim() === "") {
         throw new Error("Every GPX point needs coordinates.");
+      }
 
       const elevation = el.getElementsByTagNameNS("*", "ele")[0]?.textContent?.trim();
 
       const coordinate: RoutePoint = { lon: Number(lon), lat: Number(lat) };
 
-      if (elevation) coordinate.ele = Number(elevation);
+      if (elevation) {
+        coordinate.ele = Number(elevation);
+      }
 
-      if (i === 0 && points.length) coordinate.breakBefore = true;
+      if (i === 0 && points.length) {
+        coordinate.breakBefore = true;
+      }
+
       points.push(coordinate);
 
-      if (points.length > MAX_POINTS) throw new Error("A route is limited to 20,000 points.");
+      if (points.length > MAX_POINTS) {
+        throw new Error("A route is limited to 20,000 points.");
+      }
     }
   }
 
-  const name =
-    doc.getElementsByTagNameNS("*", "name")[0]?.textContent?.trim().slice(0, 80) ||
-    "Imported route";
+  const importedName = doc.getElementsByTagNameNS("*", "name")[0]?.textContent?.trim().slice(0, 80);
+  const name = importedName?.length ? importedName : "Imported route";
 
   return { name, points: validatePoints(points) };
 }
@@ -170,9 +208,14 @@ export function unwrap(points: RoutePoint[], reference = points[0]?.lon ?? 0) {
   return points.map((p) => {
     let lon = p.lon;
 
-    while (lon - previous > 180) lon -= 360;
+    while (lon - previous > 180) {
+      lon -= 360;
+    }
 
-    while (lon - previous < -180) lon += 360;
+    while (lon - previous < -180) {
+      lon += 360;
+    }
+
     previous = lon;
 
     return { ...p, lon };
@@ -183,7 +226,9 @@ export function mapPaths(routes: Route[], width = 960, height = 450) {
   const ref = routes[0]?.points[0]?.lon ?? 0;
   const flat = routes.flatMap((r) => unwrap(r.points, ref));
 
-  if (!flat.length) return [];
+  if (!flat.length) {
+    return [];
+  }
 
   const cos = Math.max(
     0.01,
@@ -207,6 +252,7 @@ export function mapPaths(routes: Route[], width = 960, height = 450) {
     const data = samples(unwrap(r.points, ref));
 
     const occurrences = new Map<string, number>();
+
     const coords = data.map((p) => {
       const fingerprint = JSON.stringify([p.lon, p.lat, p.ele, p.breakBefore, p.km]);
       const occurrence = occurrences.get(fingerprint) ?? 0;
@@ -230,53 +276,62 @@ export function mapPaths(routes: Route[], width = 960, height = 450) {
   });
 }
 
-export function seedRoutes(): Route[] {
-  function make(
-    id: string,
-    name: string,
-    target: number,
-    base: number,
-    gain: number,
-    wide: number,
-    color: string,
-  ): Route {
-    const pts: RoutePoint[] = Array.from({ length: 121 }, (_, i) => {
-      const t = i / 120;
-      const theta = t * Math.PI * 2;
+function makeSeedRoute(
+  id: string,
+  name: string,
+  target: number,
+  base: number,
+  gain: number,
+  wide: number,
+  color: string,
+): Route {
+  const pts: RoutePoint[] = Array.from({ length: 121 }, (_, i) => {
+    const t = i / 120;
+    const theta = t * Math.PI * 2;
 
-      return {
-        lon: -122 + (0.025 * wide * Math.cos(theta) + 0.007 * Math.sin(theta * 3)),
-        lat: 45 + (0.018 * Math.sin(theta) + 0.003 * Math.sin(theta * 5)),
-        ele: Math.round(base + gain * Math.pow(Math.sin(Math.PI * t), 2)),
-      };
-    });
+    return {
+      lon: -122 + (0.025 * wide * Math.cos(theta) + 0.007 * Math.sin(theta * 3)),
+      lat: 45 + (0.018 * Math.sin(theta) + 0.003 * Math.sin(theta * 5)),
+      ele: Math.round(base + gain * Math.pow(Math.sin(Math.PI * t), 2)),
+    };
+  });
 
-    const current = summary(pts).distance;
-    const factor = target / current;
+  const current = summary(pts).distance;
+  const factor = target / current;
 
-    for (const p of pts) {
-      p.lon = -122 + (p.lon + 122) * factor;
-      p.lat = 45 + (p.lat - 45) * factor;
-    }
-
-    return { id, name, color, points: pts };
+  for (const p of pts) {
+    p.lon = -122 + (p.lon + 122) * factor;
+    p.lat = 45 + (p.lat - 45) * factor;
   }
 
+  return { id, name, color, points: pts };
+}
+
+export function seedRoutes(): Route[] {
   return [
-    make("fern", "Fern Loop", 8.2, 732, 410, 1, COLORS[0]),
-    make("ridge", "Ridge Traverse", 10.6, 610, 620, 1.4, COLORS[1]),
+    makeSeedRoute("fern", "Fern Loop", 8.2, 732, 410, 1, COLORS[0]),
+    makeSeedRoute("ridge", "Ridge Traverse", 10.6, 610, 620, 1.4, COLORS[1]),
   ];
 }
 
 export function restore(text: string | null): Route[] {
-  if (text === null) return seedRoutes();
+  if (text === null) {
+    return seedRoutes();
+  }
+
   const result = SavedAtlasSchema.safeParse(JSON.parse(text));
 
-  if (!result.success) throw new Error("The saved atlas could not be read.");
+  if (!result.success) {
+    throw new Error("The saved atlas could not be read.");
+  }
+
   const ids = new Set<string>();
 
   return result.data.routes.map((r, i) => {
-    if (ids.has(r.id)) throw new Error("Invalid saved route.");
+    if (ids.has(r.id)) {
+      throw new Error("Invalid saved route.");
+    }
+
     ids.add(r.id);
 
     return { id: r.id, name: r.name.slice(0, 80), color: COLORS[i], points: r.points };
@@ -290,8 +345,12 @@ export function elevationPath(
 ) {
   return data
     .map((p, i) => {
-      if (p.ele === undefined) return "";
+      if (p.ele === undefined) {
+        return "";
+      }
+
       const connected = data[i - 1]?.ele !== undefined && !p.breakBefore;
+
       return `${connected ? "L" : "M"}${x(p.km)},${y(p.ele)}`;
     })
     .join(" ");

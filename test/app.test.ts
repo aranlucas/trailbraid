@@ -10,3 +10,11 @@ test("server rendering uses the initial atlas snapshot without browser storage",
   expect(markup).toContain("Ridge Traverse");
   expect(markup).toContain("Saved atlas was unreadable");
 });
+
+test("atlas controls explicitly use non-submit buttons", () => {
+  const markup = renderToString(createElement(App));
+  const buttons = markup.match(/<button\b[^>]*>/g) ?? [];
+
+  expect(buttons.length).toBeGreaterThan(0);
+  expect(buttons.every((button) => button.includes('type="button"'))).toBe(true);
+});
