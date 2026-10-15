@@ -122,6 +122,7 @@ test("elevation paths restart after missing elevations and segment gaps", () => 
     { lon: 4, lat: 0, km: 4, ele: 40, breakBefore: true },
     { lon: 5, lat: 0, km: 5, ele: 50 },
   ];
+
   expect(
     elevationPath(
       data,
@@ -145,6 +146,7 @@ test("map coordinates retain unique stable identities for duplicate samples", ()
     color: "#000",
     points: [points[0], points[0], points[1]],
   };
+
   const keys = mapPaths([route])[0].coords.map((p) => p.key);
   expect(new Set(keys).size).toBe(3);
   expect(mapPaths([{ ...route, name: "Renamed" }])[0].coords.map((p) => p.key)).toEqual(keys);
@@ -164,6 +166,7 @@ test("GPX tracks retain segment gaps, elevation and trimmed names", () => {
       ]),
     ]),
   );
+
   const route = parseGpx("<gpx/>", () => document);
   expect(route.name).toBe("Forest walk");
   expect(route.points).toEqual([
@@ -180,6 +183,7 @@ test("GPX route fallback validates missing coordinates and malformed documents",
     gpxNode("rtept", { lon: "0", lat: "0" }, []),
     gpxNode("rtept", { lon: "0.01", lat: "0" }, []),
   ]);
+
   expect(parseGpx("<gpx/>", () => gpxDocument(gpxNode("gpx", {}, [route]))).points).toEqual([
     { lon: 0, lat: 0 },
     { lon: 0.01, lat: 0 },
@@ -195,4 +199,18 @@ test("GPX route fallback validates missing coordinates and malformed documents",
   expect(() => parseGpx("broken", () => gpxDocument(malformed))).toThrow(
     "Choose a valid GPX file.",
   );
+});
+
+test.each([null, "", "   "])("GPX missing or blank names use the fallback: %s", (name) => {
+  const document = gpxDocument(
+    gpxNode("gpx", {}, [
+      gpxNode("name", {}, [], name),
+      gpxNode("rte", {}, [
+        gpxNode("rtept", { lon: "0", lat: "0" }, []),
+        gpxNode("rtept", { lon: "0.01", lat: "0" }, []),
+      ]),
+    ]),
+  );
+
+  expect(parseGpx("<gpx/>", () => document).name).toBe("Imported route");
 });

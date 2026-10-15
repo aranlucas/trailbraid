@@ -12,11 +12,13 @@ const format = (n: number | null, suffix: string) =>
 
 export default function App() {
   const [store] = useState(() => createAtlasStore(() => localStorage));
+
   const { routes, notice } = useSyncExternalStore(
     store.subscribe,
     store.getSnapshot,
     store.getServerSnapshot,
   );
+
   const { setNotice } = store;
   const [active, setActive] = useState(routes[0]?.id ?? "");
   const [compare, setCompare] = useState(true);
@@ -48,14 +50,20 @@ export default function App() {
   }
 
   async function importFile(file?: File) {
-    if (!file) return;
+    if (!file) {
+      return;
+    }
+
     setBusy(true);
 
     try {
-      if (routes.length >= 4)
+      if (routes.length >= 4) {
         throw new Error("This atlas holds four routes. Remove one before importing.");
+      }
 
-      if (file.size > 5_000_000) throw new Error("GPX files are limited to 5 MB.");
+      if (file.size > 5_000_000) {
+        throw new Error("GPX files are limited to 5 MB.");
+      }
 
       const parsed = parseGpx(await file.text(), (t) =>
         new DOMParser().parseFromString(t, "application/xml"),
@@ -74,7 +82,9 @@ export default function App() {
     } finally {
       setBusy(false);
 
-      if (input.current) input.current.value = "";
+      if (input.current) {
+        input.current.value = "";
+      }
     }
   }
 
@@ -121,10 +131,15 @@ export default function App() {
           <p>Your routes, seen differently.</p>
         </div>
         <nav>
-          <button className="primary" onClick={() => input.current?.click()} disabled={busy}>
+          <button
+            type="button"
+            className="primary"
+            onClick={() => input.current?.click()}
+            disabled={busy}
+          >
             {busy ? "Reading GPX…" : "Import GPX"}
           </button>
-          <button onClick={exportNotes} disabled={!routes.length}>
+          <button type="button" onClick={exportNotes} disabled={!routes.length}>
             Export notes
           </button>
         </nav>
@@ -139,7 +154,7 @@ export default function App() {
       {notice && (
         <div className="notice" role="status">
           {notice}
-          <button onClick={() => setNotice("")} aria-label="Dismiss message">
+          <button type="button" onClick={() => setNotice("")} aria-label="Dismiss message">
             ×
           </button>
         </div>
@@ -149,6 +164,7 @@ export default function App() {
           <div className="row">
             <h2>Routes</h2>
             <button
+              type="button"
               className="icon"
               onClick={() => input.current?.click()}
               aria-label="Import another route"
@@ -160,6 +176,7 @@ export default function App() {
             {routes.map((r) => (
               <div className={`route-row ${chosen?.id === r.id ? "selected" : ""}`} key={r.id}>
                 <button
+                  type="button"
                   className="route-select"
                   onClick={() => setActive(r.id)}
                   aria-pressed={chosen?.id === r.id}
@@ -174,6 +191,7 @@ export default function App() {
                   </span>
                 </button>
                 <button
+                  type="button"
                   className="icon remove"
                   onClick={() => remove(r.id)}
                   aria-label={`Remove ${r.name}`}
@@ -183,7 +201,12 @@ export default function App() {
               </div>
             ))}
           </div>
-          <button className="compare" onClick={() => setCompare((c) => !c)} aria-pressed={compare}>
+          <button
+            type="button"
+            className="compare"
+            onClick={() => setCompare((c) => !c)}
+            aria-pressed={compare}
+          >
             <span aria-hidden="true">◯◯</span> {compare ? "Comparing routes" : "Compare routes"}
           </button>
           {overview && (
@@ -226,10 +249,11 @@ export default function App() {
           )}
           <section className="tools">
             <h2>Keep exploring</h2>
-            <button onClick={undo} disabled={!history.length}>
+            <button type="button" onClick={undo} disabled={!history.length}>
               Undo route change
             </button>
             <button
+              type="button"
               onClick={() => {
                 change(seedRoutes(), "Synthetic demo routes restored.");
                 setActive("fern");
@@ -295,10 +319,11 @@ export default function App() {
             <div className="empty">
               <h2>A fresh page in your atlas.</h2>
               <p>Import a GPX track or explore the two synthetic demo routes.</p>
-              <button className="primary" onClick={() => input.current?.click()}>
+              <button type="button" className="primary" onClick={() => input.current?.click()}>
                 Import your first GPX
               </button>
               <button
+                type="button"
                 onClick={() => {
                   change(seedRoutes());
                   setActive("fern");

@@ -1,7 +1,6 @@
-type GpxFixtureNode = {
-  localName: string;
-  textContent: string | null;
-  getAttribute: (name: string) => string | null;
+import type { GpxDocument, GpxNode } from "@/route";
+
+type GpxFixtureNode = Omit<GpxNode, "getElementsByTagNameNS"> & {
   getElementsByTagNameNS: (namespace: string, name: string) => GpxFixtureNode[];
 };
 
@@ -23,11 +22,11 @@ export function gpxNode(
   };
 }
 
-export function gpxDocument(root: GpxFixtureNode): Document {
+export function gpxDocument(root: GpxFixtureNode): GpxDocument {
   return {
     documentElement: root,
     querySelector: (selector: string) => root.getElementsByTagNameNS("*", selector)[0] ?? null,
     getElementsByTagNameNS: (namespace: string, name: string) =>
       root.getElementsByTagNameNS(namespace, name),
-  } as unknown as Document;
+  };
 }

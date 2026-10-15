@@ -4,6 +4,7 @@ import type { Route } from "@/route";
 export const ATLAS_KEY = "trailbraid.atlas.v1";
 
 const READ_FAILURE = "Saved atlas was unreadable. Demo routes loaded; import a GPX to start again.";
+
 const WRITE_FAILURE = "Browser storage is unavailable or full. Export notes before closing.";
 
 type AtlasSnapshot = {
@@ -12,6 +13,7 @@ type AtlasSnapshot = {
 };
 
 type AtlasStorage = Pick<Storage, "getItem" | "setItem">;
+
 type StorageAccess = () => AtlasStorage;
 
 function readSnapshot(storage: StorageAccess): AtlasSnapshot {
@@ -30,12 +32,16 @@ export function createAtlasStore(storage: StorageAccess) {
 
   function publish(next: AtlasSnapshot) {
     snapshot = next;
-    for (const listener of listeners) listener();
+
+    for (const listener of listeners) {
+      listener();
+    }
   }
 
   function persist(next: AtlasSnapshot): AtlasSnapshot {
     try {
       storage().setItem(ATLAS_KEY, JSON.stringify({ version: 1, routes: next.routes }));
+
       return next;
     } catch {
       return { ...next, notice: WRITE_FAILURE };
@@ -47,11 +53,16 @@ export function createAtlasStore(storage: StorageAccess) {
     getServerSnapshot: () => serverSnapshot,
     subscribe: (listener: () => void) => {
       listeners.add(listener);
+
       if (!mounted) {
         mounted = true;
         const persisted = persist(snapshot);
-        if (persisted !== snapshot) publish(persisted);
+
+        if (persisted !== snapshot) {
+          publish(persisted);
+        }
       }
+
       return () => {
         listeners.delete(listener);
       };
@@ -60,7 +71,9 @@ export function createAtlasStore(storage: StorageAccess) {
       publish(persist({ routes, notice }));
     },
     setNotice: (notice: string) => {
-      if (notice !== snapshot.notice) publish({ ...snapshot, notice });
+      if (notice !== snapshot.notice) {
+        publish({ ...snapshot, notice });
+      }
     },
   };
 }

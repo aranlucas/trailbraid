@@ -58,6 +58,7 @@ test("storage access exceptions are handled during both loading and mount persis
   const store = createAtlasStore(() => {
     throw new Error("Storage blocked");
   });
+
   expect(store.getSnapshot().notice).toMatch(/Saved atlas was unreadable/);
   const unsubscribe = store.subscribe(vi.fn());
   expect(store.getSnapshot().notice).toMatch(/Browser storage is unavailable or full/);

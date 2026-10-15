@@ -5,7 +5,9 @@ import "./styles.css";
 
 const root = document.querySelector("#root");
 
-if (!root) throw new Error("Missing #root element.");
+if (!root) {
+  throw new Error("Missing #root element.");
+}
 
 createRoot(root).render(
   <React.StrictMode>
