@@ -84,6 +84,10 @@ export function summary(points: RoutePoint[], from = 0, to = Infinity) {
   const start = Math.max(0, Math.min(from, total));
   const end = Math.max(start, Math.min(to, total));
 
+  const elevations = data
+    .filter((p) => p.km >= start && p.km <= end)
+    .flatMap((p) => (p.ele === undefined ? [] : [p.ele]));
+
   let ascent = 0;
   let descent = 0;
   let known = true;
@@ -107,14 +111,16 @@ export function summary(points: RoutePoint[], from = 0, to = Infinity) {
     }
 
     const delta = (b.ele - a.ele) * share;
+    // The window can begin or end between recorded points. Include those
+    // clipped elevations as well as any samples inside the selection.
+    elevations.push(
+      a.ele + ((b.ele - a.ele) * (Math.max(a.km, start) - a.km)) / d,
+      a.ele + ((b.ele - a.ele) * (Math.min(b.km, end) - a.km)) / d,
+    );
     ascent += Math.max(0, delta);
     descent += Math.max(0, -delta);
     maxGrade = Math.max(maxGrade, (Math.abs(b.ele - a.ele) / (d * 1000)) * 100);
   }
-
-  const elevations = data
-    .filter((p) => p.km >= start && p.km <= end)
-    .flatMap((p) => (p.ele === undefined ? [] : [p.ele]));
 
   if (data.every((p) => p.ele === undefined)) {
     known = false;

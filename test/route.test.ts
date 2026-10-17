@@ -32,6 +32,35 @@ test("selection interpolates partial edges, including ascent", () => {
   expect(s.ascent).toBeCloseTo(10, 10);
 });
 
+test("selection extrema include interpolated boundaries within a single edge", () => {
+  const edge = points.slice(0, 2);
+  const length = samples(edge)[1].km;
+  const selected = summary(edge, length / 4, (length * 3) / 4);
+
+  expect(selected.low).toBeCloseTo(15, 10);
+  expect(selected.high).toBeCloseTo(25, 10);
+  expect(selected.ascent).toBeCloseTo(10, 10);
+});
+
+test("selection extrema include both clipped boundaries and interior samples", () => {
+  const length = samples(points)[1].km;
+  const selected = summary(points, length / 2, length * 1.5);
+
+  expect(selected.low).toBeCloseTo(20, 10);
+  expect(selected.high).toBe(30);
+});
+
+test("selection extrema do not interpolate across missing elevations or segment gaps", () => {
+  const length = samples(points)[1].km;
+  const missing = [{ lon: 0, lat: 0 }, points[1]];
+  expect(summary(missing, length / 4, (length * 3) / 4).high).toBeNull();
+  const separated = [points[0], { ...points[1], breakBefore: true }, points[2]];
+  const selected = summary(separated, length / 4, (length * 3) / 4);
+
+  expect(selected.low).toBeCloseTo(22.5, 10);
+  expect(selected.high).toBeCloseTo(27.5, 10);
+});
+
 test("segment gaps never add distance or elevation", () => {
   const data = [...points, { lon: 120, lat: 40, ele: 1000, breakBefore: true }];
   expect(summary(data).distance).toBe(summary(points).distance);
