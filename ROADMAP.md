@@ -1,10 +1,10 @@
 # Feature roadmap
 
-Planning baseline: `fb83e76c7d95` on `origin/main`, 2026-10-26. Trailbraid is a route-comparison utility, not a game or navigation service.
+Proposed 2026-10-26. Trailbraid is a route-comparison utility, not a navigation service.
 
 ## Outcome
 
-Make a GPX comparison understandable and portable. The [current utility](README.md) already imports bounded GPX tracks, compares routes on a shared canvas and elevation window, and exports comparison notes.
+Make a GPX comparison understandable and portable.
 
 ## 1. Explain the quality of the imported comparison
 
@@ -31,4 +31,4 @@ Let users attach local notes to a selected distance interval and include those n
 
 ## Boundaries
 
-No online maps, live location, weather, hazard inference or navigation guidance is needed. Keep personal GPX data local and provide synthetic examples for demonstrations. Broader hike research belongs in Traverse. Use native geometry and schema libraries already present. Value is fewer mistaken comparisons and successful reuse, not an unsupported claim about route safety.
+No online maps, live location, weather, hazard inference or navigation guidance is needed. Keep personal GPX data local and provide synthetic examples for demonstrations. Broader hike research belongs in Traverse. Keep route identity explicit in text as well as color during visual redesigns.
