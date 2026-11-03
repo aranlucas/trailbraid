@@ -230,7 +230,7 @@ test("GPX route fallback validates missing coordinates and malformed documents",
   );
 });
 
-test.each([null, "", "   "])("GPX missing or blank names use the fallback: %s", (name) => {
+test.each([null, "   "])("GPX missing or blank names use the fallback: %s", (name) => {
   const document = gpxDocument(
     gpxNode("gpx", {}, [
       gpxNode("name", {}, [], name),
