@@ -75,13 +75,11 @@ export function createAtlasStore(storage: StorageAccess) {
       };
     },
     addRoute: (route: Omit<Route, "color">) => {
-      if (snapshot.routes.length >= MAX_ROUTES) {
+      const color = COLORS.find((candidate) => !snapshot.routes.some((r) => r.color === candidate));
+
+      if (snapshot.routes.length >= MAX_ROUTES || color === undefined) {
         throw new Error("This atlas holds four routes. Remove one before importing.");
       }
-
-      const color = COLORS.filter(
-        (candidate) => !snapshot.routes.some((r) => r.color === candidate),
-      )[0];
 
       change(
         [...snapshot.routes, { ...route, color }],
