@@ -10,3 +10,5 @@ coverage/
 .wrangler
 .dev.vars*
 !.dev.vars.example
+
+.e2e/

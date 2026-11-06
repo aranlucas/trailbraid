@@ -25,6 +25,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       # Installs the pnpm version from package.json and Node.js from .node-version,
       # then runs a frozen-lockfile install.
@@ -43,3 +44,32 @@ jobs:
 
           - name: Build
             run: pnpm build
+
+      - name: Prove distance-axis regression fails on baseline
+        run: |
+          cp src/atlas.tsx /tmp/atlas-fixed.tsx
+          trap 'cp /tmp/atlas-fixed.tsx src/atlas.tsx' EXIT
+          git show 6bd8e9890b4865b8b2d6e74488ae3e690e9d9eb3:src/atlas.tsx > src/atlas.tsx
+          set +e
+          pnpm exec vitest run test/profile.test.ts --reporter=json --outputFile=/tmp/profile-baseline.json
+          result=$?
+          set -e
+          test "$result" -eq 1
+          node --input-type=module -e 'import fs from "node:fs"; import assert from "node:assert/strict"; const r = JSON.parse(fs.readFileSync("/tmp/profile-baseline.json", "utf8")); assert.equal(r.numFailedTests, 1); assert.match(r.testResults[0].assertionResults[0].failureMessages.join(" "), /to be less than or equal to 14/);'
+
+      - name: Install Chromium
+        run: pnpm exec e2e-web install chromium --with-deps
+
+      - name: Browser journeys
+        run: pnpm exec e2e run
+        env:
+          E2E_TELEMETRY_DISABLED: "1"
+
+      - name: Upload browser evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-evidence
+          path: .e2e/
+          include-hidden-files: true
+          retention-days: 7
