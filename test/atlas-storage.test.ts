@@ -72,9 +72,11 @@ test("route changes and undo persist their exact routes without persisting notic
   const listener = vi.fn();
   const unsubscribe = store.subscribe(listener);
   const initial = store.getSnapshot().routes;
+
   for (const route of store.getSnapshot().routes) {
     store.removeRoute(route.id);
   }
+
   expect(store.getSnapshot()).toEqual({
     routes: [],
     notice: "Route removed. Undo is available.",
@@ -107,9 +109,11 @@ test("failed writes retain in-memory edits and take precedence over success noti
   backend.setItem.mockImplementation(() => {
     throw new Error("Quota exceeded");
   });
+
   for (const route of store.getSnapshot().routes) {
     store.removeRoute(route.id);
   }
+
   expect(store.getSnapshot().routes).toEqual([]);
   expect(store.getSnapshot().notice).toMatch(/Browser storage is unavailable or full/);
   backend.setItem.mockReset();
@@ -192,12 +196,15 @@ test("demo replacement is undoable, history is bounded, and undo at the beginnin
   expect(store.loadDemo()).toBe(store.getSnapshot().routes[0].id);
   store.undo();
   expect(store.getSnapshot().routes.map((route) => route.id)).toEqual(["ridge"]);
+
   for (let i = 0; i < 21; i++) {
     store.loadDemo();
   }
+
   for (let i = 0; i < 20; i++) {
     store.undo();
   }
+
   expect(store.getSnapshot().canUndo).toBe(false);
   expect(store.getSnapshot().routes.map((route) => route.id)).toEqual(["fern", "ridge"]);
 });

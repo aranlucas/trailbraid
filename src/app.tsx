@@ -39,6 +39,7 @@ export default function App() {
 
   function undo() {
     const restored = store.undo();
+
     if (restored !== undefined) {
       setActive(restored);
     }

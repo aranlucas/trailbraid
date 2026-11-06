@@ -82,6 +82,7 @@ export function createAtlasStore(storage: StorageAccess) {
       const color = COLORS.filter(
         (candidate) => !snapshot.routes.some((r) => r.color === candidate),
       )[0];
+
       change(
         [...snapshot.routes, { ...route, color }],
         `Imported ${route.name}. Its geometry stays on this device.`,
@@ -96,10 +97,12 @@ export function createAtlasStore(storage: StorageAccess) {
     loadDemo: () => {
       const routes = seedRoutes();
       change(routes, "Synthetic demo routes restored.");
+
       return routes[0].id;
     },
     undo: () => {
       const routes = history.at(-1);
+
       if (!routes) {
         return;
       }
@@ -108,6 +111,7 @@ export function createAtlasStore(storage: StorageAccess) {
       publish(
         persist({ routes, notice: "Last route change undone.", canUndo: history.length > 0 }),
       );
+
       return routes[0]?.id ?? "";
     },
     setNotice: (notice: string) => {

@@ -4,6 +4,7 @@ import type { Route, RoutePoint } from "@/route";
 import { RoutePointsSchema } from "@/route-validation";
 
 export const COLORS = ["#24624c", "#c16b39", "#5868a1", "#a33f64"];
+
 export const MAX_ROUTES = COLORS.length;
 
 const ATLAS_VERSION = 1;
