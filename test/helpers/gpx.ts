@@ -1,4 +1,4 @@
-import type { GpxDocument, GpxNode } from "@/route";
+import type { GpxDocument, GpxNode } from "@/gpx";
 
 type GpxFixtureNode = Omit<GpxNode, "getElementsByTagNameNS"> & {
   getElementsByTagNameNS: (namespace: string, name: string) => GpxFixtureNode[];
