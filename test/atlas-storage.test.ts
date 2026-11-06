@@ -1,6 +1,6 @@
 import { expect, test, vi } from "vitest";
 import { ATLAS_KEY, createAtlasStore } from "@/atlas-storage";
-import { seedRoutes } from "@/route";
+import { seedRoutes } from "@/atlas-data";
 
 function storage(initial: string | null = null) {
   return {
@@ -72,13 +72,22 @@ test("route changes and undo persist their exact routes without persisting notic
   const listener = vi.fn();
   const unsubscribe = store.subscribe(listener);
   const initial = store.getSnapshot().routes;
-  store.setRoutes([], "Route removed. Undo is available.");
-  expect(store.getSnapshot()).toEqual({ routes: [], notice: "Route removed. Undo is available." });
+
+  for (const route of store.getSnapshot().routes) {
+    store.removeRoute(route.id);
+  }
+
+  expect(store.getSnapshot()).toEqual({
+    routes: [],
+    notice: "Route removed. Undo is available.",
+    canUndo: true,
+  });
   expect(backend.setItem).toHaveBeenLastCalledWith(
     ATLAS_KEY,
     JSON.stringify({ version: 1, routes: [] }),
   );
-  store.setRoutes(initial, "Last route change undone.");
+  store.undo();
+  store.undo();
   expect(store.getSnapshot().routes).toBe(initial);
   expect(backend.setItem).toHaveBeenLastCalledWith(
     ATLAS_KEY,
@@ -97,15 +106,25 @@ test("failed writes retain in-memory edits and take precedence over success noti
   const backend = storage();
   const store = createAtlasStore(() => backend);
   const unsubscribe = store.subscribe(vi.fn());
-  backend.setItem.mockImplementationOnce(() => {
+  backend.setItem.mockImplementation(() => {
     throw new Error("Quota exceeded");
   });
-  store.setRoutes([], "Route removed. Undo is available.");
+
+  for (const route of store.getSnapshot().routes) {
+    store.removeRoute(route.id);
+  }
+
   expect(store.getSnapshot().routes).toEqual([]);
   expect(store.getSnapshot().notice).toMatch(/Browser storage is unavailable or full/);
+  backend.setItem.mockReset();
+  store.undo();
+  store.undo();
   const restored = seedRoutes();
-  store.setRoutes(restored, "Last route change undone.");
-  expect(store.getSnapshot()).toEqual({ routes: restored, notice: "Last route change undone." });
+  expect(store.getSnapshot()).toEqual({
+    routes: restored,
+    notice: "Last route change undone.",
+    canUndo: false,
+  });
   unsubscribe();
 });
 
@@ -115,7 +134,7 @@ test("server snapshots stay stable and independent stores do not leak updates", 
   const second = createAtlasStore(() => backend);
   const serverSnapshot = first.getServerSnapshot();
   expect(first.getServerSnapshot()).toBe(serverSnapshot);
-  first.setRoutes([], "Changed");
+  first.removeRoute(first.getSnapshot().routes[0].id);
   expect(first.getServerSnapshot()).toBe(serverSnapshot);
   expect(second.getSnapshot().routes).toHaveLength(2);
   expect(second.getSnapshot().notice).toBe("");
@@ -139,4 +158,53 @@ test("failed initial persistence is not repeated by Strict Mode subscriptions", 
   expect(first).toHaveBeenCalledOnce();
   expect(second).toHaveBeenCalledOnce();
   resubscribe();
+});
+
+test("imports commit against current routes and undo restores the intervening edit", () => {
+  const store = createAtlasStore(() => storage());
+  const [removed, remaining] = store.getSnapshot().routes;
+  // A file can finish reading after another route was removed.
+  store.removeRoute(removed.id);
+  store.addRoute({ id: "imported", name: "Imported walk", points: removed.points });
+  expect(store.getSnapshot().routes.map((route) => route.id)).toEqual([remaining.id, "imported"]);
+  expect(new Set(store.getSnapshot().routes.map((route) => route.color)).size).toBe(2);
+  store.undo();
+  expect(store.getSnapshot().routes).toEqual([remaining]);
+  store.undo();
+  expect(store.getSnapshot().routes).toEqual([removed, remaining]);
+  expect(store.getSnapshot().canUndo).toBe(false);
+});
+
+test("a full atlas rejects an import without changing routes or undo history", () => {
+  const store = createAtlasStore(() => storage());
+  const points = store.getSnapshot().routes[0].points;
+  store.addRoute({ id: "third", name: "Third", points });
+  store.addRoute({ id: "fourth", name: "Fourth", points });
+  const full = store.getSnapshot();
+  expect(() => store.addRoute({ id: "fifth", name: "Fifth", points })).toThrow(/four routes/);
+  expect(store.getSnapshot()).toBe(full);
+  store.undo();
+  expect(store.getSnapshot().routes.map((route) => route.id)).toEqual(["fern", "ridge", "third"]);
+});
+
+test("demo replacement is undoable, history is bounded, and undo at the beginning is inert", () => {
+  const store = createAtlasStore(() => storage());
+  const original = store.getSnapshot();
+  expect(store.undo()).toBeUndefined();
+  expect(store.getSnapshot()).toBe(original);
+  store.removeRoute("fern");
+  expect(store.loadDemo()).toBe(store.getSnapshot().routes[0].id);
+  store.undo();
+  expect(store.getSnapshot().routes.map((route) => route.id)).toEqual(["ridge"]);
+
+  for (let i = 0; i < 21; i++) {
+    store.loadDemo();
+  }
+
+  for (let i = 0; i < 20; i++) {
+    store.undo();
+  }
+
+  expect(store.getSnapshot().canUndo).toBe(false);
+  expect(store.getSnapshot().routes.map((route) => route.id)).toEqual(["fern", "ridge"]);
 });

@@ -1,7 +1,7 @@
 import { useRef, useState, useSyncExternalStore } from "react";
 import { Atlas, Profile } from "@/atlas";
-import { COLORS, parseGpx, seedRoutes, summary } from "@/route";
-import type { Route } from "@/route";
+import { summary } from "@/route";
+import { MAX_GPX_BYTES, parseGpx } from "@/gpx";
 
 import { createAtlasStore } from "@/atlas-storage";
 
@@ -13,7 +13,7 @@ const format = (n: number | null, suffix: string) =>
 export default function App() {
   const [store] = useState(() => createAtlasStore(() => localStorage));
 
-  const { routes, notice } = useSyncExternalStore(
+  const { routes, notice, canUndo } = useSyncExternalStore(
     store.subscribe,
     store.getSnapshot,
     store.getServerSnapshot,
@@ -24,7 +24,6 @@ export default function App() {
   const [compare, setCompare] = useState(true);
   const [from, setFrom] = useState(1.5);
   const [to, setTo] = useState(5.5);
-  const [history, setHistory] = useState<Route[][]>([]);
   const [busy, setBusy] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const chosen = routes.find((r) => r.id === active) ?? routes[0];
@@ -34,34 +33,27 @@ export default function App() {
   const end = Math.min(to, max);
   const start = Math.min(from, end);
 
-  function change(next: Route[], message = notice) {
-    setHistory((h) => [...h.slice(-19), routes]);
-    store.setRoutes(next, message);
+  function loadDemo() {
+    setActive(store.loadDemo());
   }
 
   function undo() {
-    const previous = history.at(-1);
+    const restored = store.undo();
 
-    if (previous) {
-      store.setRoutes(previous, "Last route change undone.");
-      setHistory((h) => h.slice(0, -1));
-      setActive(previous[0]?.id ?? "");
+    if (restored !== undefined) {
+      setActive(restored);
     }
   }
 
   async function importFile(file?: File) {
-    if (!file) {
+    if (!file || busy) {
       return;
     }
 
     setBusy(true);
 
     try {
-      if (routes.length >= 4) {
-        throw new Error("This atlas holds four routes. Remove one before importing.");
-      }
-
-      if (file.size > 5_000_000) {
+      if (file.size > MAX_GPX_BYTES) {
         throw new Error("GPX files are limited to 5 MB.");
       }
 
@@ -72,10 +64,9 @@ export default function App() {
       const route = {
         ...parsed,
         id: crypto.randomUUID(),
-        color: COLORS[routes.length],
       };
 
-      change([...routes, route], `Imported ${route.name}. Its geometry stays on this device.`);
+      store.addRoute(route);
       setActive(route.id);
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "Import failed.");
@@ -86,13 +77,6 @@ export default function App() {
         input.current.value = "";
       }
     }
-  }
-
-  function remove(id: string) {
-    change(
-      routes.filter((r) => r.id !== id),
-      "Route removed. Undo is available.",
-    );
   }
 
   function exportNotes() {
@@ -168,6 +152,7 @@ export default function App() {
               className="icon"
               onClick={() => input.current?.click()}
               aria-label="Import another route"
+              disabled={busy}
             >
               +
             </button>
@@ -193,7 +178,7 @@ export default function App() {
                 <button
                   type="button"
                   className="icon remove"
-                  onClick={() => remove(r.id)}
+                  onClick={() => store.removeRoute(r.id)}
                   aria-label={`Remove ${r.name}`}
                 >
                   ×
@@ -249,16 +234,10 @@ export default function App() {
           )}
           <section className="tools">
             <h2>Keep exploring</h2>
-            <button type="button" onClick={undo} disabled={!history.length}>
+            <button type="button" onClick={undo} disabled={!canUndo}>
               Undo route change
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                change(seedRoutes(), "Synthetic demo routes restored.");
-                setActive("fern");
-              }}
-            >
+            <button type="button" onClick={loadDemo}>
               Load demo routes
             </button>
             <small>
@@ -319,16 +298,15 @@ export default function App() {
             <div className="empty">
               <h2>A fresh page in your atlas.</h2>
               <p>Import a GPX track or explore the two synthetic demo routes.</p>
-              <button type="button" className="primary" onClick={() => input.current?.click()}>
-                Import your first GPX
-              </button>
               <button
                 type="button"
-                onClick={() => {
-                  change(seedRoutes());
-                  setActive("fern");
-                }}
+                className="primary"
+                disabled={busy}
+                onClick={() => input.current?.click()}
               >
+                Import your first GPX
+              </button>
+              <button type="button" onClick={loadDemo}>
                 Load demo routes
               </button>
             </div>
