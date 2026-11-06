@@ -101,6 +101,8 @@ export function Profile({ route, from, to, maximum }: ProfileProps) {
 
   const high = known.length ? Math.ceil(Math.max(...known) / 100) * 100 + 30 : 1;
 
+  const tickStep = Math.max(1, Math.ceil(maximum / 10));
+
   const x = (km: number) => 55 + (km / maximum) * 865;
   const y = (ele: number) => 128 - ((ele - low) / (high - low)) * 95;
   const path = elevationPath(data, x, y);
@@ -125,11 +127,11 @@ export function Profile({ route, from, to, maximum }: ProfileProps) {
               </text>
             </g>
           ))}
-          {Array.from({ length: Math.ceil(maximum) + 1 }, (_, i) => (
+          {Array.from({ length: Math.floor(maximum / tickStep) + 1 }, (_, i) => (
             <g key={i}>
-              <path d={`M${x(i)} 30V128`} stroke="#e4e4d8" />
-              <text x={x(i)} y="149" textAnchor="middle" fontSize="12" fill="#637468">
-                {i}
+              <path d={`M${x(i * tickStep)} 30V128`} stroke="#e4e4d8" />
+              <text x={x(i * tickStep)} y="149" textAnchor="middle" fontSize="12" fill="#637468">
+                {i * tickStep}
               </text>
             </g>
           ))}
