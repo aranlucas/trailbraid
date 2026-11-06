@@ -30,3 +30,7 @@ Regression contract: rendering a profile over a thousand-kilometre domain must p
 ## Framework and validation plan
 
 Read current published quickstart and GitHub Actions docs, plus upstream README. npm registry confirms `e2e` 0.23.0 and `@e2e-dev/web` 0.15.5; both require Node ^22.22.3 or >=24.8.0. Use the actual published packages, exact pins and lockfile; inspect shipped docs/types before authoring tests. Deterministic browser flows will cover file import and parsed metrics, reload persistence, removal/undo, malformed import preservation and export contents. No model steps or credentials. CI uploads failure evidence. No local tests, builds or benchmarks.
+
+## Independent review
+
+A same-provider independent review inspected the full repository, finding, patch, published engine types and CI strategy. It identified an initial unsupported Browser role-query call; the final tests use the supported Screen fixture. Re-review found no further concrete worthwhile defects or objections. Static lint passes. No local tests or builds ran. PR: https://github.com/aranlucas/trailbraid/pull/17; CI results remain pending and are not represented as passed.
